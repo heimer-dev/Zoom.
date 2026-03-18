@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  zoom-newspaper:
+    build: .
+    container_name: zoom-newspaper
+    ports:
+      - "3001:3001"
+    volumes:
+      - zoom-data:/data
+    environment:
+      - PORT=3001
+      - DB_PATH=/data/zoom.db
+      - JWT_SECRET=${JWT_SECRET:-zoom-secret-bitte-aendern}
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/settings', r => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  zoom-data:
+    driver: local

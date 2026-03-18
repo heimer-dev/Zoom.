@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zoom. – Ausgaben</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/reader.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="/" class="logo" style="text-decoration:none;color:white">Zoom<span style="color:#93c5fd">.</span></a>
+      <nav class="header-nav">
+        <a href="/" class="nav-link">Startseite</a>
+        <a href="/reader.html" class="nav-link active">Ausgaben</a>
+        <a href="/admin/" class="nav-link btn-admin">Admin</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- EDITION LIST VIEW -->
+  <div id="list-view">
+    <section class="hero" style="padding:40px 24px 56px">
+      <div class="hero-inner">
+        <h1 class="hero-title" style="font-size:clamp(36px,6vw,60px)">Alle Ausgaben</h1>
+        <p class="hero-subtitle">Stöbere in den Ausgaben der Zoom.</p>
+      </div>
+    </section>
+    <main class="main-content">
+      <div id="all-editions" class="editions-grid">
+        <div class="loading"><div class="spinner"></div> Lade…</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- SINGLE EDITION READER -->
+  <div id="reader-view" style="display:none">
+    <!-- Edition Header -->
+    <div id="reader-cover" class="reader-cover">
+      <div class="reader-cover-inner">
+        <div class="reader-cover-logo">Zoom.</div>
+        <h1 id="reader-title" class="reader-cover-title"></h1>
+        <p id="reader-subtitle" class="reader-cover-subtitle"></p>
+        <div id="reader-meta" class="reader-cover-meta"></div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="reader-toolbar">
+      <div class="reader-toolbar-inner">
+        <button onclick="goBack()" class="reader-btn"><span>←</span> Zurück</button>
+        <div class="reader-toolbar-title" id="toolbar-title"></div>
+        <div style="display:flex;gap:8px">
+          <button onclick="downloadPdf()" class="reader-btn reader-btn-primary">
+            <span>⬇</span> PDF herunterladen
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Article content -->
+    <div class="reader-content" id="reader-content">
+      <div class="loading"><div class="spinner"></div> Lade Ausgabe…</div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-logo">Zoom.</div>
+    <div class="footer-tagline">Die Schülerzeitung des Burgaugymnasiums</div>
+    <div class="footer-links">
+      <a href="/reader.html">Alle Ausgaben</a>
+      <a href="/admin/">Redaktion</a>
+    </div>
+    <div class="footer-copy">© <span id="year"></span> Zoom.</div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const API = '/api';
+    let currentEditionId = null;
+
+    const BLOCK_ICONS = {
+      article: '📰', joke: '😂', student_month: '⭐', quote: '💬',
+      events: '📅', sports: '⚽', recipe: '🍳', poll: '📊',
+      tip: '💡', announcement: '📢', gallery: '🖼️', interview: '🎤'
+    };
+    const BLOCK_LABELS = {
+      article: 'Artikel', joke: 'Witz der Woche', student_month: 'Schüler des Monats',
+      quote: 'Zitat der Woche', events: 'Veranstaltungen', sports: 'Sportecke',
+      recipe: 'Rezept der Woche', poll: 'Umfrage', tip: 'Tipp der Redaktion',
+      announcement: 'Bekanntmachung', gallery: 'Fotogalerie', interview: 'Interview'
+    };
+
+    function lighten(hex) {
+      try {
+        let r = parseInt(hex.slice(1,3),16)+60, g = parseInt(hex.slice(3,5),16)+60, b = parseInt(hex.slice(5,7),16)+80;
+        r=Math.min(255,r); g=Math.min(255,g); b=Math.min(255,b);
+        return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+      } catch { return '#3b82f6'; }
+    }
+
+    async function loadAllEditions() {
+      const container = document.getElementById('all-editions');
+      try {
+        const res = await fetch(`${API}/editions`);
+        const editions = await res.json();
+        const published = editions.filter(e => e.status === 'published');
+        if (!published.length) {
+          container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📰</div><div class="empty-title">Noch keine Ausgaben verfügbar</div></div>`;
+          return;
+        }
+        container.innerHTML = published.map(e => `
+          <a href="/reader.html?id=${e.id}" class="edition-card">
+            <div class="edition-cover" style="background:linear-gradient(135deg,${e.cover_color||'#1e40af'},${lighten(e.cover_color||'#1e40af')})">
+              <div class="edition-cover-title">Zoom.</div>
+              <div class="edition-cover-wave"></div>
+            </div>
+            <div class="edition-body">
+              ${e.edition_number ? `<div class="edition-number">Ausgabe ${e.edition_number}</div>` : ''}
+              <div class="edition-title">${e.title}</div>
+              ${e.subtitle ? `<div class="edition-subtitle">${e.subtitle}</div>` : ''}
+              <div class="edition-meta">
+                <span class="edition-date">${e.published_at ? new Date(e.published_at).toLocaleDateString('de-DE',{year:'numeric',month:'long',day:'numeric'}) : ''}</span>
+                <span class="edition-badge badge-published">${e.article_count||0} Artikel</span>
+              </div>
+            </div>
+          </a>`).join('');
+      } catch {
+        container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">⚠️</div><div class="empty-title">Fehler beim Laden</div></div>`;
+      }
+    }
+
+    async function loadEdition(id) {
+      currentEditionId = id;
+      document.getElementById('list-view').style.display = 'none';
+      document.getElementById('reader-view').style.display = 'block';
+
+      try {
+        const res = await fetch(`${API}/editions/${id}`);
+        const data = await res.json();
+
+        // Cover
+        const cover = document.getElementById('reader-cover');
+        cover.style.background = `linear-gradient(160deg, ${data.cover_color||'#1e3a8a'}, ${lighten(data.cover_color||'#1e3a8a')})`;
+        document.getElementById('reader-title').textContent = data.title;
+        document.getElementById('reader-subtitle').textContent = data.subtitle || '';
+        document.getElementById('toolbar-title').textContent = data.title;
+        const dateStr = data.published_at ? new Date(data.published_at).toLocaleDateString('de-DE',{year:'numeric',month:'long',day:'numeric'}) : '';
+        document.getElementById('reader-meta').textContent = [
+          data.edition_number ? `Ausgabe ${data.edition_number}` : '',
+          dateStr
+        ].filter(Boolean).join(' · ');
+
+        // Articles
+        const content = document.getElementById('reader-content');
+        if (!data.articles || !data.articles.length) {
+          content.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Diese Ausgabe hat noch keine Artikel</div></div>`;
+          return;
+        }
+
+        content.innerHTML = data.articles.map(a => renderArticle(a)).join('');
+      } catch(err) {
+        document.getElementById('reader-content').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Fehler beim Laden</div></div>`;
+      }
+    }
+
+    function renderArticle(a) {
+      const isSpecial = a.block_type !== 'article';
+      const icon = BLOCK_ICONS[a.block_type] || '📰';
+      const label = BLOCK_LABELS[a.block_type] || a.block_type;
+      const layoutClass = { two_column: 'layout-two-col', feature: 'layout-feature', full_width: 'layout-full', sidebar: 'layout-sidebar' }[a.layout] || '';
+
+      return `
+        <article class="reader-article ${layoutClass}" style="--bg:${a.bg_color};--text:${a.text_color};--accent:${a.accent_color};--header:${a.header_color}">
+          ${isSpecial ? `<div class="block-type-badge" style="background:${a.accent_color}">${icon} ${label}</div>` : ''}
+          <h2 class="article-title">${a.title}</h2>
+          ${a.author_name ? `<div class="article-author">von ${a.author_name}</div>` : ''}
+          <div class="article-body">${a.content || '<p><em>Kein Inhalt</em></p>'}</div>
+        </article>`;
+    }
+
+    function goBack() {
+      window.location.href = '/reader.html';
+    }
+
+    function downloadPdf() {
+      if (currentEditionId) {
+        window.open(`/api/pdf/edition/${currentEditionId}`, '_blank');
+      }
+    }
+
+    // Route based on URL params
+    const params = new URLSearchParams(location.search);
+    const editionId = params.get('id');
+    if (editionId) {
+      loadEdition(editionId);
+    } else {
+      loadAllEditions();
+    }
+  </script>
+</body>
+</html>
