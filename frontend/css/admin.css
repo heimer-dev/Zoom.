@@ -405,9 +405,23 @@ body.admin-body {
   flex-shrink: 0;
   border-right: 1px solid var(--gray-200);
   background: var(--gray-50);
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+.editor-split-left-header {
+  flex-shrink: 0;
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--gray-50);
+}
+#article-list-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 .editor-split-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .editor-split-right { width: 280px; min-width: 280px; overflow-y: auto; }

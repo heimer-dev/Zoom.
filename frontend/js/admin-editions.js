@@ -174,11 +174,11 @@ function renderEditorShell() {
     <div class="editor-split">
       <!-- Left: Article list -->
       <div class="editor-split-left">
-        <div style="padding:16px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
+        <div class="editor-split-left-header">
           <span style="font-size:13px;font-weight:600;color:#374151">Abschnitte</span>
           ${hasRole('contributor') ? `<button class="btn btn-primary btn-sm" onclick="showNewArticleModal()">+ Neu</button>` : ''}
         </div>
-        <div id="article-list-container" style="flex:1;overflow-y:auto"></div>
+        <div id="article-list-container"></div>
       </div>
 
       <!-- Middle: Editor -->
