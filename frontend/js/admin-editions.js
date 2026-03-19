@@ -164,6 +164,7 @@ function renderEditorShell() {
       </span>
       <div style="flex:1"></div>
       <span class="autosave-indicator" id="autosave-ind">●</span>
+      ${hasRole('contributor') ? `<button class="btn btn-primary btn-sm" onclick="showNewArticleModal()">+ Neu</button>` : ''}
       ${hasRole('editor') ? `<button class="btn btn-secondary btn-sm" onclick="showEditionSettingsModal()">⚙️ Einstellungen</button>` : ''}
       ${hasRole('editor') && e.status === 'draft' ? `<button class="btn btn-success btn-sm" onclick="publishEdition()">🚀 Veröffentlichen</button>` : ''}
       ${hasRole('editor') && e.status === 'published' ? `<button class="btn btn-secondary btn-sm" onclick="unpublishEdition()">📥 Zurück zu Entwurf</button>` : ''}
