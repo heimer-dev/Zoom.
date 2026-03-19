@@ -165,6 +165,41 @@
       }
     }
 
+    function deltaToHtml(content) {
+      if (!content) return '<p><em>Kein Inhalt</em></p>';
+      let delta;
+      try { delta = typeof content === 'string' ? JSON.parse(content) : content; } catch(e) { return content; }
+      if (!delta || !delta.ops) return content;
+      let html = '', listBuffer = [], listType = null;
+      function flushList() {
+        if (!listBuffer.length) return;
+        const tag = listType === 'ordered' ? 'ol' : 'ul';
+        html += `<${tag}>${listBuffer.map(li => `<li>${li}</li>`).join('')}</${tag}>`;
+        listBuffer = []; listType = null;
+      }
+      for (let i = 0; i < delta.ops.length; i++) {
+        const op = delta.ops[i];
+        if (typeof op.insert !== 'string') continue;
+        const attrs = op.attributes || {};
+        const nextOp = delta.ops[i + 1];
+        const nextAttrs = (nextOp && nextOp.insert === '\n' && nextOp.attributes) ? nextOp.attributes : null;
+        if (op.insert === '\n') { flushList(); html += '<br>'; continue; }
+        let text = op.insert.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        if (attrs.bold) text = `<strong>${text}</strong>`;
+        if (attrs.italic) text = `<em>${text}</em>`;
+        if (attrs.underline) text = `<u>${text}</u>`;
+        if (attrs.strike) text = `<s>${text}</s>`;
+        if (attrs.link) text = `<a href="${attrs.link}">${text}</a>`;
+        if (nextAttrs && nextAttrs.header) { flushList(); html += `<h${nextAttrs.header}>${text}</h${nextAttrs.header}>`; i++; }
+        else if (nextAttrs && nextAttrs.list) { if (listType && listType !== nextAttrs.list) flushList(); listType = nextAttrs.list; listBuffer.push(text); i++; }
+        else if (nextAttrs && nextAttrs.blockquote) { flushList(); html += `<blockquote>${text}</blockquote>`; i++; }
+        else { flushList(); html += text; }
+      }
+      flushList();
+      html = html.replace(/([^>]+)(<br>|$)/g, (m, t, e) => t.trim() ? `<p>${t.trim()}</p>${e}` : e);
+      return html || '<p><em>Kein Inhalt</em></p>';
+    }
+
     function renderArticle(a) {
       const isSpecial = a.block_type !== 'article';
       const icon = BLOCK_ICONS[a.block_type] || '📰';
@@ -176,7 +211,7 @@
           ${isSpecial ? `<div class="block-type-badge" style="background:${a.accent_color}">${icon} ${label}</div>` : ''}
           <h2 class="article-title">${a.title}</h2>
           ${a.author_name ? `<div class="article-author">von ${a.author_name}</div>` : ''}
-          <div class="article-body">${a.content || '<p><em>Kein Inhalt</em></p>'}</div>
+          <div class="article-body">${deltaToHtml(a.content)}</div>
         </article>`;
     }
 
