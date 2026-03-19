@@ -4,6 +4,90 @@ const { getDb } = require('../database/init');
 
 const router = express.Router();
 
+// Convert Quill Delta JSON to HTML
+function deltaToHtml(content) {
+  if (!content) return '';
+  let delta;
+  try {
+    delta = typeof content === 'string' ? JSON.parse(content) : content;
+  } catch (e) {
+    // Not JSON, return as-is (already HTML or plain text)
+    return content;
+  }
+  if (!delta || !delta.ops) return content;
+
+  let html = '';
+  let listBuffer = [];
+  let listType = null;
+
+  function flushList() {
+    if (listBuffer.length === 0) return;
+    const tag = listType === 'ordered' ? 'ol' : 'ul';
+    html += `<${tag}>${listBuffer.map(li => `<li>${li}</li>`).join('')}</${tag}>`;
+    listBuffer = [];
+    listType = null;
+  }
+
+  for (let i = 0; i < delta.ops.length; i++) {
+    const op = delta.ops[i];
+    if (typeof op.insert !== 'string') continue;
+
+    const attrs = op.attributes || {};
+    const nextOp = delta.ops[i + 1];
+    const nextAttrs = (nextOp && nextOp.insert === '\n' && nextOp.attributes) ? nextOp.attributes : null;
+
+    if (op.insert === '\n') {
+      // Block-level newline
+      const blockAttrs = attrs;
+      if (blockAttrs.header) {
+        // already handled by accumulation below
+      } else if (blockAttrs.list) {
+        // handled below
+      } else {
+        flushList();
+        html += '<br>';
+      }
+      continue;
+    }
+
+    // Accumulate text until next \n to apply block formatting
+    // Inline formatting
+    let text = op.insert.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    if (attrs.bold) text = `<strong>${text}</strong>`;
+    if (attrs.italic) text = `<em>${text}</em>`;
+    if (attrs.underline) text = `<u>${text}</u>`;
+    if (attrs.strike) text = `<s>${text}</s>`;
+    if (attrs.link) text = `<a href="${attrs.link}">${text}</a>`;
+
+    // Check what block type follows this insert
+    if (nextAttrs && nextAttrs.header) {
+      flushList();
+      html += `<h${nextAttrs.header}>${text}</h${nextAttrs.header}>`;
+      i++; // skip the \n
+    } else if (nextAttrs && nextAttrs.list) {
+      if (listType && listType !== nextAttrs.list) flushList();
+      listType = nextAttrs.list;
+      listBuffer.push(text);
+      i++; // skip the \n
+    } else if (nextAttrs && nextAttrs.blockquote) {
+      flushList();
+      html += `<blockquote>${text}</blockquote>`;
+      i++;
+    } else {
+      flushList();
+      html += text;
+    }
+  }
+
+  flushList();
+  // Wrap bare text runs in paragraphs
+  html = html.replace(/([^>]+)(<br>|$)/g, (match, text, ending) => {
+    if (text.trim()) return `<p>${text.trim()}</p>${ending}`;
+    return ending;
+  });
+  return html;
+}
+
 // Generate PDF for an edition
 router.get('/edition/:id', async (req, res) => {
   const db = getDb();
@@ -44,7 +128,7 @@ router.get('/edition/:id', async (req, res) => {
         ${isSpecial ? `<div class="block-badge" style="background:${a.accent_color};color:#fff;display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;margin-bottom:8px;">${blockIcons[a.block_type] || ''} ${blockLabels[a.block_type] || a.block_type}</div>` : ''}
         <h2 style="color:${a.header_color};margin:0 0 12px;font-size:18px;">${a.title}</h2>
         ${a.author_name ? `<div style="font-size:11px;color:#6b7280;margin-bottom:10px;">von ${a.author_name}</div>` : ''}
-        <div class="article-content">${a.content || ''}</div>
+        <div class="article-content">${deltaToHtml(a.content)}</div>
       </div>`;
   }).join('\n');
 
